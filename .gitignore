@@ -1,0 +1,3 @@
+*.tmp
+__pycache__/
+data/pms/raw/*.sql
