@@ -31,7 +31,7 @@ feat=[c for c in dayf.columns if '|' in c]
 # Sites where part of the solar feeds in at a local board (confirmed by RSS): the load meter does not see that solar, so
 # "load - solar" understates the generators by the locally-fed share. Share k estimated per site from days with good data:
 # generator counters = (load - solar) + k * solar.
-LOCAL_SOLAR=['UAE - Target - C','UAE - Galfar - C','KSA - Fame Fardani - C','KSA - AYTB Jubail - C']
+LOCAL_SOLAR=['UAE - Target - C','UAE - Galfar - C','KSA - Fame Fardani - C']   # AYTB Jubail also has local solar but its meter gap does not vary with solar (fixed offset), so no correction is applied there
 kd=dq.merge(sd[['project','date','solar_kwh']],on=['project','date'],how='left'); kd=kd[kd.project.isin(LOCAL_SOLAR)&(kd.dg_kwh>200)&(kd.solar_kwh>0)&kd.r.between(0.85,1.35)]
 K=(kd.groupby('project').apply(lambda g:(g.ck-g.dg_kwh).sum()/g.solar_kwh.sum())).clip(0,1).to_dict()
 print('local solar share k:',{p:round(v,3) for p,v in K.items()})
