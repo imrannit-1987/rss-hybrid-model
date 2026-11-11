@@ -16,10 +16,11 @@ Pipeline (run from this folder):
   python3 model/fit_fuel_v3.py fuel_dataset_v3.csv fit_v3
 Portal pulls (tools/pull.py <sql> <csv>) go through the Grafana API; only needed to extend the data forward.
 
-## v4 fuel model (11 Nov 2026) — weekly-report truth
+## v4 fuel model (11 Nov 2026)
+Truth = MONTHLY reports (final call; include corrections and delivery variances). Weekly-report rows are used for resolution only, with each
+site-month's weekly fuel scaled to its monthly report (fuel_dataset_v4_week_rec.csv), and are fitted together with the monthly rows.
   python3 model/build_fuel_dataset_v4.py outputs/gen_hourly.csv.gz outputs/site_day.csv outputs/month_truth.csv outputs/gen_families.csv data/reports/weekly_daily_all.csv outputs/fuel_dataset_v4_week.csv outputs/fuel_dataset_v4_month.csv
-  python3 model/fit_fuel_v4.py outputs/fuel_dataset_v4_week.csv outputs/fuel_dataset_v4_month.csv outputs/fit_v4
+  python3 model/fit_fuel_v4.py outputs/fuel_dataset_v4_week_rec.csv outputs/fuel_dataset_v4_month.csv outputs/fit_v4
   (cd outputs && python3 ../model/sim_all.py pms/pms_quarterly.csv sim/sim_all_monthly_v4.csv v4)
-Same curve form as v3, trained on 1,525 site-weeks (weekly reports) instead of 384 site-months. LOSO on weekly truth: week |err| 3.2% (v3 4.5%), site 2.0% (3.6%), fleet +0.6% (+2.5%).
-model/fuelfit4.py holds the fitter (options tested and rejected are still switchable there). outputs/fit_v4/coef_v4.json is the current coefficient set; 'rated_h|*','kwh|*' = fleet curve for engine families not in the data.
-Note: weekly reports total ~2% less fuel than monthly reports for the same months.
+LOSO on monthly rows: month |err| 4.3% (v3 4.6%), site 2.3% (3.1%), site p90 10.3% (11.0%). Full simulation: month 5.4% (6.0%), site 3.4% (3.7%).
+model/fuelfit4.py holds the fitter; outputs/fit_v4/coef_v4.json is the current coefficient set ('rated_h|*','kwh|*' = fleet curve for unseen engine families).

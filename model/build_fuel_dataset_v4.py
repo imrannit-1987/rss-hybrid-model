@@ -46,8 +46,18 @@ agg={c:'sum' for c in feat+['ck','fuel','dg','load','solar']}; agg.update(days=(
 W=w.groupby(['project','week'])[feat+['ck','fuel','dg','load','solar','fuel_estimated','refuel_day']].sum()
 W['days']=w.groupby(['project','week']).size(); W['kwp']=w.groupby(['project','week']).kwp.median()
 W=W[W.days>=5]
+# reconcile to the MONTHLY report (final truth): scale each week's fuel by that site-month's monthly/weekly efficiency ratio
+w['month']=w.date.dt.to_period('M').dt.to_timestamp()
+mw=w.groupby(['project','month']).agg(wf=('fuel','sum'),wdg=('dg','sum'),nd=('fuel','size')).join(T.set_index(['project','month'])[['fuel','dg']].rename(columns={'fuel':'mf','dg':'mdg'}),how='left')
+mw['rec']=((mw.mf/mw.mdg)/(mw.wf/mw.wdg)).where((mw.nd>=20)&(mw.mf>0)&(mw.mdg>0))
+mw['rec']=mw.rec.where(mw.rec.between(0.75,1.35))
+w=w.join(mw.rec,on=['project','month']); w['fuel_rec']=w.fuel*w.rec
+Wr=w.groupby(['project','week']).agg(fuel_rec=('fuel_rec',lambda x:x.sum(min_count=len(x))),rec=('rec','mean'))
+W=W.join(Wr); W['fuel_weekly_report']=W.fuel
 W=finish(W,'weekly'); W['month']=W.index.get_level_values(1).to_period('M').to_timestamp() if False else pd.DatetimeIndex(W.index.get_level_values(1)).to_period('M').to_timestamp()
 W.to_csv(outw)
+Wm=W.dropna(subset=['fuel_rec']).copy(); Wm['fuel']=Wm.fuel_rec; Wm['eff']=Wm.fuel/Wm.dg; Wm=Wm[Wm.eff.between(0.15,1.5)]
+Wm.to_csv(outw.replace('.csv','_rec.csv')); print(f'weekly reconciled to monthly reports: {len(Wm)} weeks; {Wm.index.get_level_values(0).nunique()} sites; median adjustment {Wm.rec.median():.3f}')
 # ---- monthly truth (as v3, extended features) ----
 dq['month']=dq.date.dt.to_period('M').dt.to_timestamp()
 dm=dayf.reset_index(); dm['month']=dm.date.dt.to_period('M').dt.to_timestamp()
