@@ -28,8 +28,17 @@ dayf['ck']=F.groupby(['project','date']).kwh.sum()
 nun=F[F.run>0.5].groupby(['project','date']).gen.nunique().rename('units_run'); dayf=dayf.join(nun)
 feat=[c for c in dayf.columns if '|' in c]
 
+# Sites where part of the solar feeds in at a local board (confirmed by RSS): the load meter does not see that solar, so
+# "load - solar" understates the generators by the locally-fed share. Share k estimated per site from days with good data:
+# generator counters = (load - solar) + k * solar.
+LOCAL_SOLAR=['UAE - Target - C','UAE - Galfar - C','KSA - Fame Fardani - C','KSA - AYTB Jubail - C']
+kd=dq.merge(sd[['project','date','solar_kwh']],on=['project','date'],how='left'); kd=kd[kd.project.isin(LOCAL_SOLAR)&(kd.dg_kwh>200)&(kd.solar_kwh>0)&kd.r.between(0.85,1.35)]
+K=(kd.groupby('project').apply(lambda g:(g.ck-g.dg_kwh).sum()/g.solar_kwh.sum())).clip(0,1).to_dict()
+print('local solar share k:',{p:round(v,3) for p,v in K.items()})
+pd.Series(K,name='local_solar_share').rename_axis('project').to_csv(os.path.join(os.path.dirname(outw),'local_solar_share.csv'))
 def finish(X,label):
-    X=X.copy(); X['scale']=X.dg/X.ck; X[feat]=X[feat].mul(X.scale,axis=0)
+    X=X.copy(); kk=X.index.get_level_values(0).map(lambda p:K.get(p,0.0)).values
+    X['dg_reported']=X.dg; X['dg']=X.dg+kk*X.solar.fillna(0); X['scale']=X.dg/X.ck; X[feat]=X[feat].mul(X.scale,axis=0)
     X['country']=X.index.get_level_values(0).str[:3]; n0=len(X)
     X=X[(X.fuel>0)&(X.dg>0)&X.scale.between(0.8,1.6)]
     X['eff']=X.fuel/X.dg; X=X[X.eff.between(0.15,1.5)]
