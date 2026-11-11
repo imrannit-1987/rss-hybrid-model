@@ -2,8 +2,8 @@
 -> PMS start/stop dispatch (site/quarter settings) -> engine-family fuel curves fitted WITHOUT that site -> month fuel & L/kWh vs report.
 usage: sim_all.py pms_quarterly.csv out.csv"""
 import sys, json, numpy as np, pandas as pd
-pq,out=sys.argv[1:3]
-LOSO=json.load(open('fit_v3/loso_coefs_v3.json')); FULL=json.load(open('fit_v3/coef_v3.json'))
+pq,out=sys.argv[1:3]; VER=sys.argv[3] if len(sys.argv)>3 else 'v3'
+LOSO=json.load(open(f'fit_{VER}/loso_coefs_{VER}.json')); FULL=json.load(open(f'fit_{VER}/coef_{VER}.json'))
 GF=pd.read_csv('gen_families.csv').drop_duplicates('dev_clean').set_index('dev_clean')
 KV=[(0,150,'≤125 kVA'),(150,235,'200–220 kVA'),(235,275,'250 kVA'),(275,325,'300 kVA'),(325,400,'350 kVA'),(400,650,'500 kVA'),(650,900,'800 kVA'),(900,1400,'1000–1250 kVA')]
 def fam_of(g,k):
