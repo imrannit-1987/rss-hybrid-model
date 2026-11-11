@@ -27,6 +27,7 @@ ws=sheet(wb,'Summary',R,{c:'0.0%' for c in R.columns[2:]},[52,11,13,13,13,11,14,
 n=len(R)+5
 for t in ['Training data: 2025 and 2026. Weekly-report rows with fuel scaled so each site-month matches its monthly report (1,156 weeks), plus the monthly rows. Same curve form as v3.',
           'Generator kWh corrected for locally-fed solar at Target, Galfar and Fame Fardani (see "Local solar" tab). AYTB Jubail left uncorrected: its meter gap does not vary with solar.',
+          'KSA vs UAE: a general KSA uplift of about 7% applies to every engine family. The 1250 kVA Cummins KTA50 is fitted separately per country (KSA about 17% worse at 35% loading). Fully separate KSA and UAE curve sets were tested and predict new sites worse, because several families then rest on 3 sites or fewer.',
           'Tested and rejected (no gain out of sample): cubic loading term, low-load hours, start counts, seasonal term, per-family loading term, pooling families toward a fleet curve.',
           'KENT is the only Scania DC13 site, so leaving it out leaves nothing to learn that engine from. Use the "excl. KENT" rows as the new-site benchmark.',
           'Time split: both versions over-predict 2026 by 2-4% when trained only on data to Dec 2025, i.e. the fleet ran slightly more efficiently in 2026.']:

@@ -9,6 +9,7 @@ KV=[(0,150,'≤125 kVA'),(150,235,'200–220 kVA'),(235,275,'250 kVA'),(275,325,
 def fam_of(g,k):
     f=GF.family.get(g); return f if isinstance(f,str) else 'unlisted '+next(n for lo,hi,n in KV if lo<=k<hi)
 D=pd.read_csv('gen_hourly.csv.gz',parse_dates=['t']); D['month']=D.t.dt.to_period('M').dt.to_timestamp(); D['fam']=[fam_of(g,k) for g,k in zip(D.gen,D.kva)]
+SPL=set(FULL.get('_split_ksa',[])); D['fam']=[f+' [KSA]' if (f in SPL and p.startswith('KSA')) else f for f,p in zip(D.fam,D.project)]
 T=pd.read_csv('month_truth.csv',parse_dates=['month']); T=T[(T.fuel>0)&(T.dg>0)]
 P=pd.read_csv(pq) if pq!='none' else pd.DataFrame(columns=['project','q','starts','start_pct_p50','stops','stop_pct_p50'])
 DEF={'C':(0.65,0.37),'I':(0.50,0.30),'S':(0.50,0.30)}

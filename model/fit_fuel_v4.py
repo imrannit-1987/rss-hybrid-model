@@ -4,6 +4,17 @@ usage: fit_fuel_v4.py fuel_dataset_v4_week_rec.csv fuel_dataset_v4_month.csv out
 import sys, os, json, numpy as np, pandas as pd, warnings; warnings.filterwarnings('ignore')
 sys.path.insert(0,os.path.dirname(__file__)); from fuelfit4 import Model, loso, score, families
 Wr=pd.read_csv(sys.argv[1],parse_dates=['week']).set_index(['project','week']).rename_axis(['project','t']); M=pd.read_csv(sys.argv[2],parse_dates=['month']).set_index(['project','month']).rename_axis(['project','t']); out=sys.argv[3]; os.makedirs(out,exist_ok=True)
+# Engine families fitted separately for KSA and UAE (on top of the general KSA multiplier). Splitting every shared family
+# was tested and is worse out of sample (too few sites per family per country); the 1250 kVA KTA50 is the one where the gap is
+# large (KSA ~19% worse at 35% loading) and the split helps.
+SPLIT_KSA=['Cummins KTA50 (1250 kVA)']
+def split_ksa(d):
+    d=d.copy(); k=(d.index.get_level_values(0).str[:3]=='KSA'); new={}
+    for f in SPLIT_KSA:
+        for c in [c for c in d.columns if c.endswith('|'+f)]:
+            v=d[c].values.copy(); new[c+' [KSA]']=np.where(k,v,0.0); d[c]=np.where(k,0.0,v)
+    return pd.concat([d,pd.DataFrame(new,index=d.index)],axis=1)
+Wr=split_ksa(Wr); M=split_ksa(M)
 W=pd.concat([Wr,M]).fillna(0)      # training set
 mk=lambda:Model()
 cv4=loso(mk,W,M); cv3=loso(mk,M,M)
@@ -36,7 +47,9 @@ for f in m.fam:
             r[f'L/kWh@{int(l*100)}%']=m.curve(f,l,cty); e=np.array([b.curve(f,l,cty) for b in B if f in b.fam])
             if len(e)>20: r[f'@{int(l*100)}% p10']=np.quantile(e,.1); r[f'@{int(l*100)}% p90']=np.quantile(e,.9)
         rows.append(r)
-CV=pd.DataFrame(rows); CV.to_csv(f'{out}/fuel_curves_v4.csv',index=False)
+CV=pd.DataFrame(rows)
+CV=CV[~((CV.family.str.endswith(' [KSA]')&(CV.country=='UAE'))|(CV.family.isin(SPLIT_KSA)&(CV.country=='KSA')))].copy(); CV['family']=CV.family.str.replace(' [KSA]','',regex=False)
+CV.to_csv(f'{out}/fuel_curves_v4.csv',index=False)
 print(S.round(3).sort_values('err_v4').to_string())
 print(CV[CV.country=='UAE'][['family','sites','rows','share_of_fleet_kwh','L/kWh@25%','L/kWh@35%','@35% p10','@35% p90','L/kWh@50%','L/kWh@75%']].sort_values('L/kWh@35%').round(3).to_string(index=False))
 print('country:',round(m.m['KSA'],3),round(m.m['UAE'],3),' fleet prior a0,b0,q:',np.round(m.coef[2*nf:2*nf+3],4))
@@ -45,6 +58,6 @@ def as_json(mm):
     k=len(mm.fam); c={f'rated_h|{f}':float(mm.coef[i]) for i,f in enumerate(mm.fam)}; c.update({f'kwh|{f}':float(mm.coef[k+i]) for i,f in enumerate(mm.fam)})
     c.update({'rated_h|*':float(mm.coef[2*k]),'kwh|*':float(mm.coef[2*k+1]),'kwh_l|*':float(mm.coef[2*k+2]),'country|KSA':mm.m['KSA'],'country|UAE':mm.m['UAE']})
     allf=set(fam_all)|set(pd.read_csv(os.path.join(os.path.dirname(sys.argv[1]),'gen_families.csv')).family.dropna())|{f'unlisted {n}' for n in ['≤125 kVA','200–220 kVA','250 kVA','300 kVA','350 kVA','500 kVA','800 kVA','1000–1250 kVA']}
-    c['_fold']={f:(f if f in mm.fam else '*') for f in allf}; return c
+    allf|={f+' [KSA]' for f in SPLIT_KSA}; c['_fold']={f:(f if f in mm.fam else '*') for f in allf}; c['_split_ksa']=SPLIT_KSA; return c
 full=as_json(m); json.dump(full,open(f'{out}/coef_v4.json','w'),indent=1,ensure_ascii=False)
 json.dump({p:as_json(mk().fit(W.drop(index=p,level=0))) for p in sites},open(f'{out}/loso_coefs_v4.json','w'),ensure_ascii=False)
